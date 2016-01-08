@@ -118,7 +118,7 @@ if __name__=="__main__":
     print(option.url)
     input()
     threading_num=option.thread_num
-    domain_name=option.url+"/"
+    domain_name=option.url,"/"
     print(domain_name)
     input()
     showdetail=option.show_message
