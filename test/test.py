@@ -30,7 +30,7 @@ parser.add_option("-d","--dict",dest="dictionary",metavar="FILE",default="doc.tx
 parser.add_option("-e","--execlude",dest="exclude_list",action="append",help="Setting the excludtion extend file name whitch you don't want to try,like .jpg .gif etc")
 
 exclude_list=['.jpg','.gif','.css','.png','.js']
-   
+user_make_thread_dead=False
 
 class HTTPBackendScanner(object):
     
@@ -64,9 +64,10 @@ class HTTPBackendScanner(object):
             
 
     def crawler(self):
+        global users_make_thread_dead
         HttpStatus=''
         print("thread %s  strart "% (str(threading.get_ident())))
-        while not self.q.empty():
+        while (not self.q.empty())and(user_make_thread_dead == False):
             path=self.q.get()
             url="%s%s" %(domain_name,path)
             opener=urllib.request.build_opener()
@@ -92,19 +93,25 @@ class HTTPBackendScanner(object):
                     #print(threading.Thread.getname())
                     #print("States[%s]:Path:%s" % (str(response.getcode()), url))
                     else:
-                        result_list.append(url)
+                        self.result_list.append(url)
                         print("States[%s]:Path:%s" %(str(response.getcode(),url)))
             except urllib.error.HTTPError as e:
+                print(e.reason)
+                if e.reason.lower()!="not found":
+                    raise
+                '''
                 if self.showdetail:
                     print ("Get error in HTTP connection",end ="")
                     print(e.getreason)
                     if self.HttpErrorHandler(e.getreason):
-                        pass
+                        
                 else:
                     if self.HttpErrorHandler(e.getreason):
                         continue
                     else:
                         sys.exit(1)
+                '''
+                pass
     def HttpErrorHandler(self,errstr):
         if errstr=="not found":                                                     #If http error is 404 not found
             return True
@@ -123,7 +130,11 @@ class HTTPBackendScanner(object):
     def starting_thread(self):
         for i in range(threading_num):
             t=threading.Thread(target=self.crawler)
+            t.daemon=True                                                       #Make sure when main thread exit ,the others thread will kill themself too!
             t.start()
+            UserInput=input("input any word to stop!\n")
+            global user_make_thread_dead
+            user_make_thread_dead==True
             self.print_result()
     '''
     Scaner's main logic  function
@@ -144,14 +155,15 @@ if __name__=="__main__":
     print(option.url)
     threading_num=option.thread_num                     #specified the thread numbers.
     domain_name=option.url+"/"                          #Modify url so that it can be strcat with another file path
-    print(i"Going to parsing url:"+domain_name+"\n")          #print url after it has benn modify.
+    print("Going to parsing url:"+domain_name+"\n")          #print url after it has benn modify.
     userinput=input("Type any word to continue...or type quit to quit.,type help to get help")
     if userinput.lower()=="quit":
         print("byebye")
         sys.exit(0)
+    elif userinput.lower()=="help":
+        parser.print_help()
     else:
-        paser.print_help()
-           
+        pass        
     showdetail=option.show_message                      #Show the detail or not
     excludelist=exclude_list
     dictionary=option.dictionary
