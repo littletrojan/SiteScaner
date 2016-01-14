@@ -1,3 +1,5 @@
+#!python3
+
 import os
 import urllib.request
 import urllib.parse
@@ -6,9 +8,11 @@ import queue
 import time 
 import random
 from optparse import OptionParser
-
+import sys
+import progressbar
 '''Here is about the optionalparser '''
-parser=OptionParser()
+usage = "usage: %prog [options] arg1 arg2"
+parser=OptionParser(usage=usage)
 
 #Thread number setting parser
 parser.add_option("-t","--thread",dest="thread_num",type="int",help="Open thread number(optional)",default="1")
@@ -17,13 +21,13 @@ parser.add_option("-t","--thread",dest="thread_num",type="int",help="Open thread
 parser.add_option("-u","--url",dest="url",type="string",help="Target url to scan(required)")
 
 #Show detail message setting parser
-parser.add_option("-v",dest="show_message",action="store_true",default=False,help="set this argument to show the detail(optional)")
+parser.add_option("-v",dest="show_message",action="store_true",default=False,help="Set this argument to show the detail(optional)")
 
 #define dictionary setting parser,default using doc.txt whitch content more than 40000 list of path.
 parser.add_option("-d","--dict",dest="dictionary",metavar="FILE",default="doc.txt")
 
 #define the execlution name in the dictionary want to exclude
-parser.add_option("-e","--execlude",dest="exclude_list",action="append",help="setting the excludtion extend file name whitch you don't want to try,like .jpg .gif etc")
+parser.add_option("-e","--execlude",dest="exclude_list",action="append",help="Setting the excludtion extend file name whitch you don't want to try,like .jpg .gif etc")
 
 exclude_list=['.jpg','.gif','.css','.png','.js']
    
@@ -57,10 +61,10 @@ class HTTPBackendScanner(object):
                     self.Queue_num+=1
                     self.q.put(line)
             print("There are %s path in the list" %(self.Queue_num))
-            print("Type any word to continue.")
-            input()
+            
 
     def crawler(self):
+        HttpStatus=''
         print("thread %s  strart "% (str(threading.get_ident())))
         while not self.q.empty():
             path=self.q.get()
@@ -75,53 +79,84 @@ class HTTPBackendScanner(object):
             request=urllib.request.Request(url,bData)
 
             try:
-                print("Try to connecting %s"%(url))
+                print("Try to connecting %s"%(url),end='\t')                    #We dont want it to change line print.
                 response=urllib.request.urlopen(request)
                 content=response.read()
                 if len(content):
                     finalurl = response.geturl()
                     if finalurl!=url:
-                        print("Detect redirectrion by server! We are in %s now"  %(finalurl))
+                        if self.showdetail:
+                            print("Detect redirectrion by server! We are in %s now"  %(finalurl))
+                        else:
+                            print("{0}".format("303 Redirection"))
                     #print(threading.Thread.getname())
                     #print("States[%s]:Path:%s" % (str(response.getcode()), url))
                     else:
                         result_list.append(url)
                         print("States[%s]:Path:%s" %(str(response.getcode(),url)))
             except urllib.error.HTTPError as e:
-                print ("Get error in HTTP connection") 
+                if self.showdetail:
+                    print ("Get error in HTTP connection",end ="")
+                    print(e.getreason)
+                    if self.HttpErrorHandler(e.getreason):
+                        pass
+                else:
+                    if self.HttpErrorHandler(e.getreason):
+                        continue
+                    else:
+                        sys.exit(1)
+    def HttpErrorHandler(self,errstr):
+        if errstr=="not found":                                                     #If http error is 404 not found
+            return True
+        else:
+            return False
+        
 
     
     def print_result(self):
         for list in  self.result_list:
             print(list)
 
-
+    '''
+    After HttpBackenScan start all work will use thread to do.
+    '''
     def starting_thread(self):
         for i in range(threading_num):
             t=threading.Thread(target=self.crawler)
             t.start()
             self.print_result()
     '''
-    Sccaner's main logic  function
+    Scaner's main logic  function
     '''
     def run(self):
         self.starting_thread()
         self.print_result()
 
+'''
+Here is the usage for parser i still dont know how to handle usge in parser,so i write one
+'''
+def usage():
+    print("Use {0} -u $(url) to get the")
+
+
 
 if __name__=="__main__":
     (option,args)=parser.parse_args()
-    if (option.url==None):
-        print(parser.usage)
+    if (option.url==None):                              #if user pass none url.
+        parser.print_help()
         exit(1)
+        
     print("Program is start!")
     print(option.url)
-    input()
-    threading_num=option.thread_num
-    domain_name=option.url,"/"
-    print(domain_name)
-    input()
-    showdetail=option.show_message
+    threading_num=option.thread_num                     #specified the thread numbers.
+    domain_name=option.url+"/"                          #Modify url so that it can be strcat with another file path
+    input("Going to parsing url:"+domain_name+"\n")          #print url after it has benn modify.
+    userinput=input("Type any word to continue...or type quit to quit.")
+    if userinput.lower()=="quit":
+        print("byebye")
+        sys.exit(0)
+           
+    showdetail=option.show_message                      #Show the detail or not
     excludelist=exclude_list
     dictionary=option.dictionary
     scanner=HTTPBackendScanner(threading_num,domain_name,showdetail,excludelist,dictionary)
